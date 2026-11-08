@@ -183,7 +183,7 @@ public class MainActivity extends Activity {
             body.addView(row);
         }
         space(body, 10);
-        body.addView(text("A biblioteca de ROMs já pode ser selecionada e catalogada. A execução dos jogos depende da integração dos núcleos de emulação, que ainda será implementada e testada.", 11, Color.GRAY, false));
+        body.addView(text("Selecione um console, abra um jogo e use o botão MENU durante a execução para acessar saves, cheats e ajustes.", 11, Color.GRAY, false));
     }
 
     private android.graphics.drawable.GradientDrawable round(int color) {
@@ -264,7 +264,7 @@ public class MainActivity extends Activity {
                     Uri nested = DocumentsContract.buildChildDocumentsUriUsingTree(tree, id);
                     scanDirectory(tree, nested, parent + name + "/");
                 } else if (name != null) {
-                    String system = systemFor(name);
+                    String system = systemFor(name, parent);
                     if (system != null) {
                         long size = sizeCol >= 0 && !c.isNull(sizeCol) ? c.getLong(sizeCol) : 0;
                         allGames.add(new GameFile(name, parent + name, doc.toString(), system, size));
