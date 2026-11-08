@@ -3,6 +3,8 @@ package com.celiocastro.h8tvcenter
 import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
+import android.database.Cursor
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -134,12 +136,78 @@ class EmulatorActivity : ComponentActivity() {
 
     private fun copyRomToCache(uri: Uri, title: String): File {
         val extension = title.substringAfterLast('.', "rom").take(8).let { ".$it" }
-        val target = File(cacheDir, "active_rom$extension")
+        val safeFolder = title.substringBeforeLast('.', title).replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val folder = File(cacheDir, "roms/$safeFolder").apply { mkdirs() }
+        val mainFile = File(folder, "game$extension")
+        copyDocument(uri, mainFile)
+        val ext = extension.lowercase(Locale.ROOT)
+        if (ext == ".cue" || ext == ".gdi" || ext == ".m3u") {
+            val text = mainFile.readText()
+            val referenced = linkedSetOf<String>()
+            if (ext == ".cue") {
+                val quoted = Regex("""(?i)^\\s*FILE\\s+"([^"]+)"\\s+\\w+""")
+                val plain = Regex("""(?i)^\\s*FILE\\s+(\\S+)\\s+\\w+""")
+                text.lineSequence().forEach { line ->
+                    (quoted.find(line)?.groupValues?.get(1) ?: plain.find(line)?.groupValues?.get(1))
+                        ?.let { referenced.add(it.substringAfterLast('/').substringAfterLast('\\\\')) }
+                }
+            } else if (ext == ".gdi") {
+                val gdiTrack = Regex("""(?i)^\\s*\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+"?(.+?\\.(?:bin|raw|wav|iso))"?\\s+\\d+\\s*$""")
+                text.lineSequence().forEach { line ->
+                    gdiTrack.find(line)?.groupValues?.get(1)?.let {
+                        referenced.add(it.substringAfterLast('/').substringAfterLast('\\\\'))
+                    }
+                }
+            } else {
+                text.lineSequence().map { it.trim() }.filter { it.isNotBlank() && !it.startsWith("#") }
+                    .forEach { referenced.add(it.substringAfterLast('/').substringAfterLast('\\\\')) }
+            }
+            copySiblingFiles(uri, folder, referenced)
+        }
+        return mainFile
+    }
+
+    private fun copyDocument(uri: Uri, destination: File) {
         contentResolver.openInputStream(uri).use { input ->
             requireNotNull(input) { "O Android não forneceu acesso ao arquivo." }
-            target.outputStream().use { output -> input.copyTo(output) }
+            destination.outputStream().use { output -> input.copyTo(output) }
         }
-        return target
+    }
+
+    private fun copySiblingFiles(sourceUri: Uri, destinationFolder: File, names: Set<String>) {
+        if (names.isEmpty()) return
+        val treeRaw = getSharedPreferences("h8tv_library", MODE_PRIVATE).getString("rom_tree_uri", null)
+            ?: throw IllegalStateException("A pasta original de ROMs não está vinculada.")
+        val tree = Uri.parse(treeRaw)
+        val documentId = DocumentsContract.getDocumentId(sourceUri)
+        val parentId = documentId.substringBeforeLast('/', "")
+        require(parentId.isNotEmpty()) { "Não foi possível localizar os arquivos da mesma pasta." }
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE
+        )
+        val found = HashSet<String>()
+        contentResolver.query(children, projection, null, null, null)?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            val nameCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            val mimeCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(nameCol) ?: continue
+                if (names.any { it.equals(name, ignoreCase = true) } &&
+                    !DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(mimeCol))) {
+                    val id = cursor.getString(idCol)
+                    val siblingUri = DocumentsContract.buildDocumentUriUsingTree(tree, id)
+                    copyDocument(siblingUri, File(destinationFolder, name))
+                    found.add(name.lowercase(Locale.ROOT))
+                }
+            }
+        }
+        val missing = names.filterNot { found.contains(it.lowercase(Locale.ROOT)) }
+        if (missing.isNotEmpty()) {
+            throw IllegalStateException("Arquivos associados não encontrados: ${missing.joinToString()}")
+        }
     }
 
     private fun showGameMenu(title: String) {
