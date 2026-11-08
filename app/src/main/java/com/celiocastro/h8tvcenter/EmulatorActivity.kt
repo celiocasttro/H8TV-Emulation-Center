@@ -100,11 +100,12 @@ class EmulatorActivity : ComponentActivity() {
         "SUPER NINTENDO" -> "snes9x_libretro_android.so"
         "ARCADE" -> "fbneo_libretro_android.so"
         "PLAYSTATION" -> "pcsx_rearmed_libretro_android.so"
-        "NINTENDO 64" -> "mupen64plus_next_libretro_android.so"
-        "NINTENDO DS" -> "desmume_libretro_android.so"
+        "NINTENDO 64" -> "mupen64plus_next_gles3_libretro_android.so"
+        "NINTENDO DS" -> "melonds_libretro_android.so"
         "DREAMCAST" -> "flycast_libretro_android.so"
         "PSP" -> "ppsspp_libretro_android.so"
-        "SEGA SATURN" -> "beetle_saturn_libretro_android.so"
+        "SEGA SATURN" -> "yabasanshiro_libretro_android.so"
+        "NATIVE32" -> "native32emu_libretro_android.so"
         else -> throw IllegalArgumentException("Sistema ainda sem núcleo configurado: $system")
     }
 
