@@ -99,7 +99,7 @@ class EmulatorActivity : ComponentActivity() {
             gameFilePath = romFile.absolutePath
             systemDirectory = this@EmulatorActivity.systemDirectory.absolutePath
             savesDirectory = savesDir.absolutePath
-            saveRAMState = if (sramFile.exists()) sramFile.readBytes() else null
+            saveRAMState = if (sramFile.exists() && sramFile.length() > 0L) sramFile.readBytes() else null
             shader = ShaderConfig.Default
             viewportAlignment = ViewportAlignment.CENTER
             preferLowLatencyAudio = true
@@ -395,7 +395,8 @@ class EmulatorActivity : ComponentActivity() {
 
     private fun saveSRAM() {
         try {
-            sramFile.writeBytes(retroView.serializeSRAM())
+            val data = retroView.serializeSRAM()
+            if (data.isNotEmpty()) sramFile.writeBytes(data)
         } catch (_: Exception) { }
     }
 
