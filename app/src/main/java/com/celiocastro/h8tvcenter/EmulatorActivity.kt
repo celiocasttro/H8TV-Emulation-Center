@@ -222,7 +222,7 @@ class EmulatorActivity : ComponentActivity() {
             }
             .setPositiveButton("Aplicar", null)
             .setNeutralButton("Desativar todos") { _, _ ->
-                try { retroView.setCheat(0, false, ""); } catch (_: Exception) {}
+                cheatCodes.indices.forEach { index -> try { retroView.setCheat(index, false, cheatCodes[index].second) } catch (_: Exception) {} }
             }.show()
     }
 
