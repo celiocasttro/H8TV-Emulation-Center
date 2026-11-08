@@ -91,7 +91,9 @@ public class MainActivity extends Activity {
                 rowParams.bottomMargin = dp(10);
                 content.addView(row, rowParams);
             }
-            row.addView(createSystemCard(systems[i][0], systems[i][1]), new LinearLayout.LayoutParams(0, dp(104), 1));
+            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, dp(104), 1);
+            cardParams.setMargins(dp(4), dp(2), dp(4), dp(2));
+            row.addView(createSystemCard(systems[i][0], systems[i][1]), cardParams);
         }
 
         TextView footer = new TextView(this);
@@ -121,7 +123,6 @@ public class MainActivity extends Activity {
         card.setFocusable(true);
         card.setFocusableInTouchMode(true);
         card.setBackground(background(PANEL, dp(12), Color.rgb(54, 60, 72), dp(1)));
-        LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) card.getLayoutParams();
         card.setPadding(dp(6), dp(8), dp(6), dp(8));
 
         TextView icon = new TextView(this);
@@ -151,9 +152,6 @@ public class MainActivity extends Activity {
         card.setOnClickListener(v ->
             Toast.makeText(this, name + ": biblioteca será habilitada na próxima etapa.", Toast.LENGTH_SHORT).show()
         );
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, dp(104), 1);
-        cardParams.setMargins(dp(4), dp(2), dp(4), dp(2));
-        card.setLayoutParams(cardParams);
         return card;
     }
 
