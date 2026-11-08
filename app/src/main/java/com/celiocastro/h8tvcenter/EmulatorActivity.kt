@@ -90,10 +90,11 @@ class EmulatorActivity : ComponentActivity() {
         stateDirectory = File(filesDir, "states").apply { mkdirs() }
         updateStateFile()
 
+        systemDirectory = File(filesDir, "system").apply { mkdirs() }
         val data = GLRetroViewData(this).apply {
             coreFilePath = coreFile.absolutePath
             gameFilePath = romFile.absolutePath
-            systemDirectory = File(filesDir, "system").apply { mkdirs() }.absolutePath
+            systemDirectory = this@EmulatorActivity.systemDirectory.absolutePath
             savesDirectory = File(filesDir, "saves").apply { mkdirs() }.absolutePath
             shader = ShaderConfig.Default
             viewportAlignment = ViewportAlignment.CENTER
