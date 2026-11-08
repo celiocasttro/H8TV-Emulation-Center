@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CORES=(stella nestopia genesis_plus_gx gambatte mgba snes9x fbneo pcsx_rearmed mupen64plus_next_gles3 melonds flycast ppsspp yabasanshiro native32emu)
+          CORES=(stella nestopia genesis_plus_gx gambatte mgba snes9x fbneo pcsx_rearmed mupen64plus_next_gles3 melonds flycast ppsspp native32emu)
           for abi in arm64-v8a armeabi-v7a; do
             DEST="app/src/main/jniLibs/$abi"
             mkdir -p "$DEST"
@@ -61,6 +61,18 @@ jobs:
               test -n "$binary"
               cp "$binary" "$DEST/"
             done
+            if [ "$abi" = "arm64-v8a" ]; then
+              extra_core="yabasanshiro"
+            else
+              extra_core="mednafen_saturn"
+            fi
+            archive="/tmp/${extra_core}-${abi}.zip"
+            curl --retry 3 --retry-delay 2 -fsSL "$BASE/${extra_core}_libretro_android.so.zip" -o "$archive"
+            mkdir -p "/tmp/core-${extra_core}-${abi}"
+            unzip -o -q "$archive" -d "/tmp/core-${extra_core}-${abi}"
+            binary="$(find "/tmp/core-${extra_core}-${abi}" -type f -name '*_libretro_android.so' -print -quit)"
+            test -n "$binary"
+            cp "$binary" "$DEST/"
             ls -lh "$DEST"
           done
 
