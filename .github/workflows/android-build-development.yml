@@ -58,6 +58,12 @@ jobs:
           done
           ls -lh "$DEST"
 
+      - name: Reuse debug signing key for consistent APK updates
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: h8tv-debug-signing-key-v1
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
