@@ -232,6 +232,7 @@ class EmulatorActivity : ComponentActivity() {
             "Carregar cheats (.cht)",
             "Gerenciar cheats",
             "Configurar controle",
+            "Trocar disco (jogos multidisco)",
             "Importar BIOS/arquivos do sistema",
             "Fechar jogo"
         )
@@ -254,8 +255,9 @@ class EmulatorActivity : ComponentActivity() {
                     12 -> cheatPicker.launch(arrayOf("*/*"))
                     13 -> showCheats()
                     14 -> showControllerSettings()
-                    15 -> biosPicker.launch(null)
-                    16 -> finish()
+                    15 -> showDiskSelector()
+                    16 -> biosPicker.launch(null)
+                    17 -> finish()
                 }
             }.show()
     }
@@ -316,6 +318,26 @@ class EmulatorActivity : ComponentActivity() {
                     copied[0]++
                 }
             }
+        }
+    }
+
+
+    private fun showDiskSelector() {
+        try {
+            val count = retroView.getAvailableDisks()
+            if (count <= 1) {
+                Toast.makeText(this, "Este jogo/núcleo não disponibiliza troca de discos.", Toast.LENGTH_LONG).show()
+                return
+            }
+            val current = retroView.getCurrentDisk().coerceIn(0, count - 1)
+            val labels = Array(count) { "Disco ${it + 1}" }
+            AlertDialog.Builder(this).setTitle("Selecionar disco")
+                .setSingleChoiceItems(labels, current) { dialog, which ->
+                    retroView.changeDisk(which)
+                    dialog.dismiss()
+                }.setNegativeButton("Cancelar", null).show()
+        } catch (_: Exception) {
+            Toast.makeText(this, "Troca de disco não suportada por este núcleo.", Toast.LENGTH_LONG).show()
         }
     }
 
