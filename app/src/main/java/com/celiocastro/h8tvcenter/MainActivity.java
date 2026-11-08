@@ -6,6 +6,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
@@ -169,8 +172,7 @@ public class MainActivity extends Activity {
                 card.setFocusable(true);
                 card.setPadding(dp(4), dp(12), dp(4), dp(12));
                 card.setBackground(round(PANEL));
-                TextView icon = text(iconFor(sys), 27, Color.WHITE, true);
-                card.addView(icon);
+                card.addView(new SystemIconView(this, sys), new LinearLayout.LayoutParams(dp(58), dp(42)));
                 TextView name = text(sys, 11, Color.WHITE, true);
                 name.setGravity(Gravity.CENTER);
                 card.addView(name);
@@ -184,6 +186,99 @@ public class MainActivity extends Activity {
         }
         space(body, 10);
         body.addView(text("Selecione um console, abra um jogo e use o botão MENU durante a execução para acessar saves, cheats e ajustes.", 11, Color.GRAY, false));
+    }
+
+
+    private class SystemIconView extends View {
+        private final String system;
+        private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint red = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        SystemIconView(android.content.Context context, String system) {
+            super(context);
+            this.system = system;
+            line.setColor(Color.WHITE);
+            line.setStrokeWidth(dp(2));
+            line.setStyle(Paint.Style.STROKE);
+            line.setStrokeCap(Paint.Cap.ROUND);
+            line.setStrokeJoin(Paint.Join.ROUND);
+            red.setColor(ACCENT);
+            red.setStyle(Paint.Style.FILL);
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth(), h = getHeight();
+            canvas.save();
+            canvas.scale(w / 100f, h / 70f);
+            if (system.contains("GAME BOY") || system.equals("PSP") || system.equals("NINTENDO DS")) {
+                drawHandheld(canvas);
+            } else if (system.equals("ARCADE")) {
+                drawArcade(canvas);
+            } else if (system.equals("ATARI 2600")) {
+                drawJoystick(canvas);
+            } else {
+                drawController(canvas);
+            }
+            canvas.restore();
+        }
+
+        private void drawHandheld(Canvas c) {
+            c.drawRoundRect(30, 3, 70, 67, 7, 7, line);
+            if (system.equals("NINTENDO DS")) {
+                c.drawRoundRect(35, 8, 65, 31, 3, 3, line);
+                c.drawRoundRect(35, 37, 65, 60, 3, 3, line);
+                c.drawCircle(22, 35, 3, red);
+            } else {
+                c.drawRoundRect(36, 9, 64, 34, 2, 2, line);
+                c.drawLine(39, 46, 51, 46, line);
+                c.drawLine(45, 40, 45, 52, line);
+                c.drawCircle(59, 45, 3, red);
+                c.drawCircle(65, 51, 3, line);
+            }
+        }
+
+        private void drawArcade(Canvas c) {
+            c.drawRoundRect(27, 3, 73, 67, 4, 4, line);
+            c.drawRoundRect(34, 10, 66, 39, 2, 2, line);
+            c.drawLine(35, 47, 65, 47, line);
+            c.drawLine(43, 54, 43, 61, line);
+            c.drawCircle(43, 51, 3, red);
+            c.drawCircle(57, 53, 3, line);
+        }
+
+        private void drawJoystick(Canvas c) {
+            c.drawRoundRect(19, 48, 81, 64, 5, 5, line);
+            c.drawLine(50, 48, 50, 19, line);
+            c.drawCircle(50, 15, 8, red);
+            c.drawCircle(32, 55, 3, line);
+            c.drawCircle(68, 55, 3, line);
+        }
+
+        private void drawController(Canvas c) {
+            Path body = new Path();
+            body.moveTo(25, 23);
+            body.quadTo(15, 22, 12, 38);
+            body.quadTo(8, 61, 24, 61);
+            body.quadTo(34, 60, 40, 50);
+            body.lineTo(60, 50);
+            body.quadTo(66, 60, 76, 61);
+            body.quadTo(92, 61, 88, 38);
+            body.quadTo(85, 22, 75, 23);
+            body.quadTo(62, 27, 50, 27);
+            body.quadTo(38, 27, 25, 23);
+            c.drawPath(body, line);
+            c.drawLine(28, 34, 28, 48, line);
+            c.drawLine(21, 41, 35, 41, line);
+            c.drawCircle(70, 35, 4, red);
+            c.drawCircle(79, 43, 4, line);
+            if (system.equals("NINTENDO 64")) {
+                c.drawCircle(50, 38, 4, red);
+            } else if (system.equals("PLAYSTATION") || system.equals("SEGA SATURN")) {
+                c.drawCircle(54, 39, 2.5f, line);
+                c.drawCircle(62, 39, 2.5f, line);
+            }
+        }
     }
 
     private android.graphics.drawable.GradientDrawable round(int color) {
