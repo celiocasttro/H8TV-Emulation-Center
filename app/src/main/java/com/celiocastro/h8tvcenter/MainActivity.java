@@ -399,7 +399,6 @@ public class MainActivity extends Activity {
         if (ext.equals("gbc")) return "GAME BOY COLOR";
         if (ext.equals("gba")) return "GAME BOY ADVANCE";
         if (ext.equals("sfc") || ext.equals("smc")) return "SUPER NINTENDO";
-        if (ext.equals("zip") || ext.equals("7z")) return "ARCADE";
         if (ext.equals("n64") || ext.equals("z64") || ext.equals("v64")) return "NINTENDO 64";
         if (ext.equals("nds")) return "NINTENDO DS";
         if (ext.equals("cso")) return "PSP";
