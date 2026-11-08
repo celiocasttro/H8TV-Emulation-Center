@@ -275,7 +275,7 @@ public class MainActivity extends Activity {
     }
 
     private String systemFor(String filename, String folderPath) {
-        String path = (folderPath + filename).toLowerCase(Locale.ROOT);
+        String path = ("/" + folderPath + filename).toLowerCase(Locale.ROOT);
         if (path.contains("native32")) return "NATIVE32";
         if (path.contains("atari2600") || path.contains("atari 2600") || path.contains("/atari/")) return "ATARI 2600";
         if (path.contains("megadrive") || path.contains("mega drive") || path.contains("genesis")) return "MEGA DRIVE";
