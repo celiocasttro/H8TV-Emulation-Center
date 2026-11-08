@@ -1,213 +1,397 @@
 package com.celiocastro.h8tvcenter;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.graphics.Color;
-import android.graphics.Canvas;
-import android.graphics.Paint;
-import android.graphics.RectF;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
 public class MainActivity extends Activity {
     private static final int BG = Color.rgb(10, 12, 16);
     private static final int PANEL = Color.rgb(25, 29, 37);
     private static final int ACCENT = Color.rgb(229, 9, 20);
-    private LinearLayout root;
-    private LinearLayout content;
+    private static final int PICK_FOLDER = 7101;
+    private static final String PREFS = "h8tv_library";
+    private static final String PREF_TREE = "rom_tree_uri";
+    private static final String PREF_FAVORITES = "favorites";
+    private static final String PREF_HISTORY = "history";
 
     private final String[][] systems = {
-        {"ATARI 2600", "Clássicos"},
-        {"NES", "Nintendo"},
-        {"MASTER SYSTEM", "Sega"},
-        {"MEGA DRIVE", "Sega"},
-        {"GAME BOY", "Nintendo"},
-        {"GAME BOY COLOR", "Nintendo"},
-        {"GAME BOY ADVANCE", "Nintendo"},
-        {"SUPER NINTENDO", "Nintendo"},
-        {"ARCADE", "Arcade"},
-        {"PLAYSTATION", "Sony"},
-        {"NINTENDO 64", "Experimental"},
-        {"NINTENDO DS", "Experimental"},
-        {"DREAMCAST", "Experimental"},
-        {"PSP", "Experimental"},
-        {"SEGA SATURN", "Experimental"},
-        {"NATIVE32", "Formato especial"}
+        {"ATARI 2600", "Atari 2600", "a26|bin"},
+        {"NES", "Nintendo Entertainment System", "nes|unf|unif"},
+        {"MASTER SYSTEM", "Sega Master System", "sms"},
+        {"MEGA DRIVE", "Sega Mega Drive", "md|gen|bin"},
+        {"GAME BOY", "Game Boy", "gb"},
+        {"GAME BOY COLOR", "Game Boy Color", "gbc"},
+        {"GAME BOY ADVANCE", "Game Boy Advance", "gba"},
+        {"SUPER NINTENDO", "Super Nintendo", "sfc|smc"},
+        {"ARCADE", "Arcade", "zip|7z"},
+        {"PLAYSTATION", "PlayStation", "cue|iso|chd|pbp"},
+        {"NINTENDO 64", "Nintendo 64", "n64|z64|v64"},
+        {"NINTENDO DS", "Nintendo DS", "nds"},
+        {"DREAMCAST", "Dreamcast", "cdi|gdi|chd"},
+        {"PSP", "PlayStation Portable", "iso|cso"},
+        {"SEGA SATURN", "Sega Saturn", "cue|iso|chd"},
+        {"NATIVE32", "Native32", "smf|sgm|ssl"}
     };
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-        );
-        buildHome();
+    private final List<GameFile> allGames = new ArrayList<>();
+    private LinearLayout root;
+    private LinearLayout body;
+    private String selectedSystem = null;
+    private String searchTerm = "";
+    private boolean favoritesOnly = false;
+    private SharedPreferences prefs;
+
+    private static class GameFile {
+        String name, path, uri, system;
+        long size;
+        GameFile(String name, String path, String uri, String system, long size) {
+            this.name = name; this.path = path; this.uri = uri; this.system = system; this.size = size;
+        }
     }
 
-    private void buildHome() {
+    @Override public void onCreate(Bundle state) {
+        super.onCreate(state);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        immersive();
+        prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        showHome();
+    }
+
+    private void immersive() {
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+    }
+
+    private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+
+    private TextView text(String value, int size, int color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(value); t.setTextSize(size); t.setTextColor(color);
+        if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        return t;
+    }
+
+    private Button button(String label, Runnable action) {
+        Button b = new Button(this);
+        b.setText(label); b.setTextColor(Color.WHITE);
+        b.setAllCaps(false); b.setTextSize(13);
+        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(PANEL));
+        b.setOnClickListener(v -> action.run());
+        b.setFocusable(true);
+        return b;
+    }
+
+    private void base(String subtitle) {
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
-        root.setPadding(dp(34), dp(22), dp(34), dp(22));
-
-        TextView brand = new TextView(this);
-        brand.setText("H8TV  /  EMULATION CENTER");
-        brand.setTextColor(Color.WHITE);
-        brand.setTextSize(24);
-        brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        root.setPadding(dp(30), dp(18), dp(30), dp(18));
+        TextView brand = text("H8TV  /  EMULATION CENTER", 23, Color.WHITE, true);
         root.addView(brand);
-
-        TextView subtitle = new TextView(this);
-        subtitle.setText("SUA BIBLIOTECA RETRÔ EM UM SÓ LUGAR");
-        subtitle.setTextColor(Color.LTGRAY);
-        subtitle.setTextSize(11);
-        subtitle.setLetterSpacing(0.12f);
-        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
-        subParams.bottomMargin = dp(20);
-        root.addView(subtitle, subParams);
-
+        TextView sub = text(subtitle, 11, Color.LTGRAY, false);
+        sub.setPadding(0, dp(3), 0, dp(14));
+        root.addView(sub);
+        body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
         ScrollView scroll = new ScrollView(this);
-        content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        scroll.addView(content);
+        scroll.setFillViewport(true);
+        scroll.addView(body);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-
-        addSection("CONSOLES");
-        LinearLayout row = null;
-        for (int i = 0; i < systems.length; i++) {
-            if (i % 4 == 0) {
-                row = new LinearLayout(this);
-                row.setOrientation(LinearLayout.HORIZONTAL);
-                LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
-                rowParams.bottomMargin = dp(10);
-                content.addView(row, rowParams);
-            }
-            LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, dp(104), 1);
-            cardParams.setMargins(dp(4), dp(2), dp(4), dp(2));
-            row.addView(createSystemCard(systems[i][0], systems[i][1]), cardParams);
-        }
-
-        TextView footer = new TextView(this);
-        footer.setText("PROTÓTIPO 0.1.0  •  MAIS PLATAFORMAS E EMULADORES SERÃO ADICIONADOS POR ETAPAS");
-        footer.setTextColor(Color.GRAY);
-        footer.setTextSize(10);
-        footer.setPadding(0, dp(16), 0, 0);
-        root.addView(footer);
-
         setContentView(root);
     }
 
-    private void addSection(String title) {
-        TextView label = new TextView(this);
-        label.setText(title);
-        label.setTextColor(ACCENT);
-        label.setTextSize(12);
-        label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        label.setPadding(0, 0, 0, dp(10));
-        content.addView(label);
+    private void addBar(String title, Runnable back) {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = text(title, 15, ACCENT, true);
+        bar.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
+        if (back != null) bar.addView(button("← Voltar", back));
+        body.addView(bar);
+        space(body, 8);
     }
 
-    private View createSystemCard(String name, String category) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER);
-        card.setFocusable(true);
-        card.setFocusableInTouchMode(true);
-        card.setBackground(background(PANEL, dp(12), Color.rgb(54, 60, 72), dp(1)));
-        card.setPadding(dp(6), dp(8), dp(6), dp(8));
-
-        SystemIconView icon = new SystemIconView(this, systemIndex(name));
-        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(62), dp(48));
-        iconParams.bottomMargin = dp(5);
-        card.addView(icon, iconParams);
-
-        TextView title = new TextView(this);
-        title.setText(name);
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(12);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        title.setGravity(Gravity.CENTER);
-        title.setMaxLines(1);
-        card.addView(title);
-
-        TextView sub = new TextView(this);
-        sub.setText(category);
-        sub.setTextColor(Color.LTGRAY);
-        sub.setTextSize(10);
-        card.addView(sub);
-
-        card.setOnFocusChangeListener((v, focused) ->
-            v.setBackground(background(focused ? ACCENT : PANEL, dp(12),
-                focused ? Color.WHITE : Color.rgb(54, 60, 72), focused ? dp(2) : dp(1)))
-        );
-        card.setOnClickListener(v ->
-            Toast.makeText(this, name + ": biblioteca será habilitada na próxima etapa.", Toast.LENGTH_SHORT).show()
-        );
-        return card;
+    private void space(LinearLayout parent, int h) {
+        View v = new View(this);
+        parent.addView(v, new LinearLayout.LayoutParams(1, dp(h)));
     }
 
-    private int systemIndex(String name) {
-        for (int i = 0; i < systems.length; i++) if (systems[i][0].equals(name)) return i;
-        return 0;
+    private void showHome() {
+        selectedSystem = null; favoritesOnly = false;
+        base("BIBLIOTECA RETRÔ • CONTROLE REMOTO • ROMS LOCAIS E USB");
+        LinearLayout actions = new LinearLayout(this);
+        actions.addView(button("＋ Selecionar pasta de ROMs", this::pickFolder));
+        actions.addView(button("↻ Atualizar biblioteca", this::scanLibrary));
+        actions.addView(button("★ Favoritos", () -> { favoritesOnly = true; showGames(null); }));
+        actions.addView(button("Histórico", this::showHistory));
+        body.addView(actions);
+        space(body, 12);
+        Uri tree = savedTree();
+        body.addView(text(tree == null ? "Nenhuma pasta selecionada." :
+            "Pasta de ROMs vinculada. Se adicionou jogos, toque em Atualizar biblioteca.", 12, Color.LTGRAY, false));
+        space(body, 12);
+        addBar("CONSOLES", null);
+        for (int i = 0; i < systems.length; i += 4) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            for (int j = i; j < Math.min(i + 4, systems.length); j++) {
+                final String sys = systems[j][0];
+                LinearLayout card = new LinearLayout(this);
+                card.setOrientation(LinearLayout.VERTICAL);
+                card.setGravity(Gravity.CENTER);
+                card.setFocusable(true);
+                card.setPadding(dp(4), dp(12), dp(4), dp(12));
+                card.setBackground(round(PANEL));
+                TextView icon = text(iconFor(sys), 27, Color.WHITE, true);
+                card.addView(icon);
+                TextView name = text(sys, 11, Color.WHITE, true);
+                name.setGravity(Gravity.CENTER);
+                card.addView(name);
+                card.setOnFocusChangeListener((v, f) -> v.setBackground(round(f ? ACCENT : PANEL)));
+                card.setOnClickListener(v -> { selectedSystem = sys; favoritesOnly = false; showGames(sys); });
+                LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, dp(88), 1);
+                cp.setMargins(dp(4), dp(3), dp(4), dp(3));
+                row.addView(card, cp);
+            }
+            body.addView(row);
+        }
+        space(body, 10);
+        body.addView(text("A biblioteca de ROMs já pode ser selecionada e catalogada. A execução dos jogos depende da integração dos núcleos de emulação, que ainda será implementada e testada.", 11, Color.GRAY, false));
     }
 
-    // Ícones vetoriais individuais desenhados no próprio APK.
-    private class SystemIconView extends View {
-        private final int type;
-        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final int light = Color.rgb(225,230,238), mid = Color.rgb(105,115,130), red = Color.rgb(229,9,20);
-        SystemIconView(android.content.Context context, int type) { super(context); this.type = type; }
-        private void box(Canvas c,float l,float t,float r,float b,float rad,int color) { p.setStyle(Paint.Style.FILL); p.setColor(color); c.drawRoundRect(new RectF(l,t,r,b),rad,rad,p); }
-        private void dot(Canvas c,float x,float y,float rad,int color) { p.setStyle(Paint.Style.FILL); p.setColor(color); c.drawCircle(x,y,rad,p); }
-        private void line(Canvas c,float x,float y,float xx,float yy,int color,float w) { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(w); p.setStrokeCap(Paint.Cap.ROUND); p.setColor(color); c.drawLine(x,y,xx,yy,p); }
-        @Override protected void onDraw(Canvas c) {
-            super.onDraw(c); c.save(); c.scale(getWidth()/100f,getHeight()/76f);
-            switch(type) {
-                case 0: box(c,39,8,61,43,5,mid); box(c,46,13,54,32,4,red); line(c,50,43,50,53,light,4); box(c,31,52,69,63,5,light); dot(c,63,57,3,red); break;
-                case 1: box(c,15,23,85,52,5,light); box(c,22,29,78,46,3,mid); line(c,35,32,35,43,Color.BLACK,3); line(c,29,37,41,37,Color.BLACK,3); dot(c,65,35,3,red); dot(c,73,40,3,red); break;
-                case 2: box(c,16,20,84,53,7,mid); box(c,23,26,77,47,4,light); line(c,34,32,34,42,Color.DKGRAY,3); line(c,29,37,39,37,Color.DKGRAY,3); dot(c,66,36,4,red); dot(c,74,36,4,red); break;
-                case 3: box(c,12,23,88,52,10,mid); box(c,22,27,78,48,8,light); dot(c,69,35,5,red); dot(c,78,40,4,red); dot(c,28,38,6,mid); break;
-                case 4: case 5: case 6: box(c,31,3,69,72,6,light); box(c,36,9,64,35,2,mid); box(c,39,13,61,31,1,Color.rgb(91,128,105)); dot(c,43,49,4,mid); dot(c,57,49,4,red); dot(c,62,59,2,mid); dot(c,70,62,2,mid); break;
-                case 7: box(c,12,24,88,53,13,light); dot(c,30,38,8,mid); line(c,30,30,30,46,Color.DKGRAY,3); line(c,22,38,38,38,Color.DKGRAY,3); dot(c,66,34,4,red); dot(c,76,42,4,mid); break;
-                case 8: box(c,29,3,71,71,5,mid); box(c,34,9,66,31,2,Color.BLACK); box(c,35,35,65,42,2,red); dot(c,43,50,3,light); dot(c,57,50,3,light); box(c,38,60,62,66,2,Color.BLACK); break;
-                case 9: box(c,13,25,87,55,14,light); dot(c,28,39,7,mid); line(c,28,31,28,47,Color.DKGRAY,3); line(c,20,39,36,39,Color.DKGRAY,3); dot(c,68,34,3,red); dot(c,77,42,3,mid); dot(c,59,43,3,mid); break;
-                case 10: box(c,12,24,88,55,13,light); box(c,43,28,57,49,5,mid); dot(c,28,39,7,mid); dot(c,50,38,5,red); dot(c,72,37,5,mid); break;
-                case 11: box(c,25,3,75,72,6,light); box(c,30,8,70,33,2,mid); box(c,30,39,70,66,2,mid); dot(c,36,53,3,red); dot(c,64,53,3,red); break;
-                case 12: box(c,16,24,84,53,9,light); box(c,28,29,72,47,4,mid); box(c,42,32,58,43,2,Color.BLACK); dot(c,77,39,3,red); break;
-                case 13: box(c,19,12,81,65,10,light); box(c,33,18,67,46,3,mid); box(c,38,22,62,42,1,Color.rgb(45,65,85)); dot(c,26,39,5,mid); dot(c,73,33,3,red); dot(c,73,44,3,mid); break;
-                case 14: box(c,14,20,86,54,8,mid); box(c,22,25,78,48,5,light); dot(c,50,36,8,red); line(c,30,45,70,45,Color.DKGRAY,2); break;
-                default: box(c,30,8,70,65,5,light); box(c,37,16,63,48,2,mid); dot(c,50,31,6,red); line(c,40,55,60,55,red,3); line(c,44,61,56,61,red,2); break;
-            } c.restore();
+    private android.graphics.drawable.GradientDrawable round(int color) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(color); d.setCornerRadius(dp(12));
+        d.setStroke(dp(1), Color.rgb(58, 64, 75)); return d;
+    }
+
+    private String iconFor(String system) {
+        if (system.equals("ATARI 2600")) return "🕹";
+        if (system.equals("NES") || system.equals("SUPER NINTENDO")) return "🎮";
+        if (system.contains("GAME BOY") || system.equals("PSP") || system.equals("NINTENDO DS")) return "▣";
+        if (system.equals("ARCADE")) return "👾";
+        if (system.equals("PLAYSTATION") || system.equals("NINTENDO 64") || system.equals("DREAMCAST")) return "🎯";
+        return "◈";
+    }
+
+    private Uri savedTree() {
+        String raw = prefs.getString(PREF_TREE, null);
+        return raw == null ? null : Uri.parse(raw);
+    }
+
+    private void pickFolder() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION |
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        startActivityForResult(intent, PICK_FOLDER);
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_FOLDER && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            Uri tree = data.getData();
+            int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            try { getContentResolver().takePersistableUriPermission(tree, flags); } catch (Exception ignored) {}
+            prefs.edit().putString(PREF_TREE, tree.toString()).apply();
+            Toast.makeText(this, "Pasta vinculada. Lendo jogos...", Toast.LENGTH_SHORT).show();
+            scanLibrary();
         }
     }
-    private GradientDrawable background(int color, int radius, int strokeColor, int strokeWidth) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(radius);
-        drawable.setStroke(strokeWidth, strokeColor);
-        return drawable;
+
+    private void scanLibrary() {
+        Uri tree = savedTree();
+        if (tree == null) {
+            new AlertDialog.Builder(this).setMessage("Selecione primeiro a pasta onde estão suas ROMs.")
+                .setPositiveButton("Selecionar pasta", (d,w) -> pickFolder()).setNegativeButton("Cancelar", null).show();
+            return;
+        }
+        allGames.clear();
+        try {
+            String rootId = DocumentsContract.getTreeDocumentId(tree);
+            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, rootId);
+            scanDirectory(tree, children, "");
+            Collections.sort(allGames, (a,b) -> a.name.compareToIgnoreCase(b.name));
+            Toast.makeText(this, allGames.size() + " arquivo(s) de jogo encontrado(s).", Toast.LENGTH_LONG).show();
+            if (selectedSystem != null || favoritesOnly) showGames(selectedSystem); else showHome();
+        } catch (Exception e) {
+            Toast.makeText(this, "Não foi possível ler a pasta: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+    private void scanDirectory(Uri tree, Uri childrenUri, String parent) {
+        String[] projection = {DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE};
+        try (Cursor c = getContentResolver().query(childrenUri, projection, null, null, null)) {
+            if (c == null) return;
+            int idCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID);
+            int nameCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
+            int mimeCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE);
+            int sizeCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE);
+            while (c.moveToNext()) {
+                String id = c.getString(idCol);
+                String name = c.getString(nameCol);
+                String mime = c.getString(mimeCol);
+                Uri doc = DocumentsContract.buildDocumentUriUsingTree(tree, id);
+                if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+                    Uri nested = DocumentsContract.buildChildDocumentsUriUsingTree(tree, id);
+                    scanDirectory(tree, nested, parent + name + "/");
+                } else if (name != null) {
+                    String system = systemFor(name);
+                    if (system != null) {
+                        long size = sizeCol >= 0 && !c.isNull(sizeCol) ? c.getLong(sizeCol) : 0;
+                        allGames.add(new GameFile(name, parent + name, doc.toString(), system, size));
+                    }
+                }
+            }
+        } catch (Exception ignored) { }
     }
 
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
+    private String systemFor(String filename) {
+        String lower = filename.toLowerCase(Locale.ROOT);
+        int dot = lower.lastIndexOf('.');
+        if (dot < 0 || dot == lower.length()-1) return null;
+        String ext = lower.substring(dot+1);
+        for (String[] s : systems) {
+            for (String candidate : s[2].split("\\|")) {
+                if (candidate.equals(ext)) return s[0];
+            }
+        }
+        return null;
+    }
+
+    private void showGames(String system) {
+        base(favoritesOnly ? "SEUS JOGOS FAVORITOS" : (system == null ? "TODOS OS JOGOS" : system));
+        addBar(favoritesOnly ? "FAVORITOS" : (system == null ? "BIBLIOTECA" : system), this::showHome);
+        EditText search = new EditText(this);
+        search.setSingleLine(true); search.setTextColor(Color.WHITE); search.setHintTextColor(Color.GRAY);
+        search.setHint("Pesquisar jogo...");
+        body.addView(search);
+        LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
+        body.addView(list);
+        Runnable render = () -> {
+            list.removeAllViews();
+            String term = search.getText().toString().trim().toLowerCase(Locale.ROOT);
+            Set<String> fav = favorites();
+            int count = 0;
+            for (GameFile game : allGames) {
+                if (system != null && !game.system.equals(system)) continue;
+                if (favoritesOnly && !fav.contains(game.uri)) continue;
+                if (!game.name.toLowerCase(Locale.ROOT).contains(term)) continue;
+                count++;
+                LinearLayout item = new LinearLayout(this);
+                item.setGravity(Gravity.CENTER_VERTICAL);
+                item.setPadding(dp(12), dp(8), dp(12), dp(8));
+                item.setBackground(round(PANEL));
+                LinearLayout info = new LinearLayout(this); info.setOrientation(LinearLayout.VERTICAL);
+                info.addView(text(game.name, 14, Color.WHITE, true));
+                info.addView(text(game.system + "  •  " + readableSize(game.size), 10, Color.LTGRAY, false));
+                item.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+                item.addView(button(fav.contains(game.uri) ? "★" : "☆", () -> {
+                    Set<String> updated = favorites();
+                    if (!updated.add(game.uri)) updated.remove(game.uri);
+                    prefs.edit().putStringSet(PREF_FAVORITES, updated).apply();
+                    render.run();
+                }));
+                item.setFocusable(true);
+                item.setOnFocusChangeListener((v,f) -> v.setBackground(round(f ? Color.rgb(62,28,33) : PANEL)));
+                item.setOnClickListener(v -> showGameDetails(game));
+                LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, -2);
+                ip.bottomMargin = dp(6); list.addView(item, ip);
+            }
+            if (count == 0) list.addView(text(favoritesOnly ? "Nenhum favorito encontrado." :
+                "Nenhum jogo encontrado. Confira a pasta selecionada e as extensões suportadas.", 12, Color.LTGRAY, false));
+        };
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s,int st,int c,int a) {}
+            public void onTextChanged(CharSequence s,int st,int before,int count) { render.run(); }
+            public void afterTextChanged(android.text.Editable e) {}
+        });
+        render.run();
+    }
+
+    private void showGameDetails(GameFile game) {
+        String[] options = {"Adicionar/remover favorito", "Registrar no histórico", "Informações do arquivo"};
+        new AlertDialog.Builder(this).setTitle(game.name).setItems(options, (dialog, which) -> {
+            if (which == 0) {
+                Set<String> f = favorites();
+                if (!f.add(game.uri)) f.remove(game.uri);
+                prefs.edit().putStringSet(PREF_FAVORITES, f).apply();
+                Toast.makeText(this, "Favoritos atualizados.", Toast.LENGTH_SHORT).show();
+            } else if (which == 1) {
+                Set<String> h = history(); h.remove(game.uri); h.add(game.uri);
+                prefs.edit().putStringSet(PREF_HISTORY, h).apply();
+                Toast.makeText(this, "Adicionado ao histórico.", Toast.LENGTH_SHORT).show();
+            } else {
+                new AlertDialog.Builder(this).setTitle("Informações")
+                    .setMessage("Console: " + game.system + "\nArquivo: " + game.path +
+                        "\nTamanho: " + readableSize(game.size) +
+                        "\n\nA execução ainda depende da integração do núcleo de emulação deste console.")
+                    .setPositiveButton("OK", null).show();
+            }
+        }).setNegativeButton("Fechar", null).show();
+    }
+
+    private void showHistory() {
+        Set<String> history = history();
+        base("JOGOS ABERTOS RECENTEMENTE");
+        addBar("HISTÓRICO", this::showHome);
+        if (history.isEmpty()) body.addView(text("Seu histórico está vazio.", 13, Color.LTGRAY, false));
+        else {
+            for (String uri : history) {
+                GameFile found = null;
+                for (GameFile g : allGames) if (g.uri.equals(uri)) { found = g; break; }
+                if (found != null) {
+                    GameFile game = found;
+                    body.addView(button(game.name + "  •  " + game.system, () -> showGameDetails(game)));
+                }
+            }
+        }
+    }
+
+    private Set<String> favorites() {
+        Set<String> s = prefs.getStringSet(PREF_FAVORITES, null);
+        return s == null ? new HashSet<>() : new HashSet<>(s);
+    }
+    private Set<String> history() {
+        Set<String> s = prefs.getStringSet(PREF_HISTORY, null);
+        return s == null ? new HashSet<>() : new HashSet<>(s);
+    }
+    private String readableSize(long size) {
+        if (size <= 0) return "tamanho indisponível";
+        if (size < 1024*1024) return (size/1024) + " KB";
+        return String.format(Locale.getDefault(), "%.1f MB", size/(1024.0*1024.0));
+    }
+
+    @Override public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            return super.onKeyDown(keyCode, event);
+            showHome(); return true;
         }
         return super.onKeyDown(keyCode, event);
     }
