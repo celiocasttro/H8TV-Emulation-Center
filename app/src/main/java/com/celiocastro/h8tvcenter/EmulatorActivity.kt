@@ -32,6 +32,7 @@ class EmulatorActivity : ComponentActivity() {
     private lateinit var romFile: File
     private lateinit var stateFile: File
     private lateinit var stateDirectory: File
+    private lateinit var systemDirectory: File
     private var stateBaseName = "game"
     private var currentSlot = 1
     private var fastForward = false
@@ -56,6 +57,9 @@ class EmulatorActivity : ComponentActivity() {
 
     private val cheatPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) loadCheatFile(uri)
+    }
+    private val biosPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) importBiosFolder(uri)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -227,6 +231,7 @@ class EmulatorActivity : ComponentActivity() {
             "Carregar cheats (.cht)",
             "Gerenciar cheats",
             "Configurar controle",
+            "Importar BIOS/arquivos do sistema",
             "Fechar jogo"
         )
         AlertDialog.Builder(this)
@@ -248,7 +253,8 @@ class EmulatorActivity : ComponentActivity() {
                     12 -> cheatPicker.launch(arrayOf("*/*"))
                     13 -> showCheats()
                     14 -> showControllerSettings()
-                    15 -> finish()
+                    15 -> biosPicker.launch(null)
+                    16 -> finish()
                 }
             }.show()
     }
@@ -267,6 +273,48 @@ class EmulatorActivity : ComponentActivity() {
             }
         } catch (_: Exception) {
             Toast.makeText(this, "Rewind não é suportado por este núcleo.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+
+    private fun importBiosFolder(tree: Uri) {
+        try {
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            try { contentResolver.takePersistableUriPermission(tree, flags) } catch (_: Exception) {}
+            systemDirectory = File(filesDir, "system").apply { mkdirs() }
+            val rootId = DocumentsContract.getTreeDocumentId(tree)
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, rootId)
+            val copied = intArrayOf(0)
+            copyBiosDirectory(tree, children, systemDirectory, copied)
+            Toast.makeText(this, "${copied[0]} arquivo(s) de sistema/BIOS importado(s).", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Falha ao importar BIOS: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun copyBiosDirectory(tree: Uri, childrenUri: Uri, destination: File, copied: IntArray) {
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE
+        )
+        contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            val nameCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            val mimeCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+            while (cursor.moveToNext()) {
+                val id = cursor.getString(idCol)
+                val name = File(cursor.getString(nameCol) ?: continue).name
+                val target = File(destination, name)
+                val mime = cursor.getString(mimeCol)
+                if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+                    target.mkdirs()
+                    copyBiosDirectory(tree, DocumentsContract.buildChildDocumentsUriUsingTree(tree, id), target, copied)
+                } else {
+                    copyDocument(DocumentsContract.buildDocumentUriUsingTree(tree, id), target)
+                    copied[0]++
+                }
+            }
         }
     }
 
