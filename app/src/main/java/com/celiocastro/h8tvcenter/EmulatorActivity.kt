@@ -129,8 +129,11 @@ class EmulatorActivity : ComponentActivity() {
             if (audioOn) "Desativar áudio" else "Ativar áudio",
             "Filtro CRT",
             "Imagem nítida",
+            "Filtro LCD",
+            "Imagem padrão",
             "Carregar cheats (.cht)",
             "Gerenciar cheats",
+            "Configurar controle",
             "Fechar jogo"
         )
         AlertDialog.Builder(this)
@@ -145,11 +148,48 @@ class EmulatorActivity : ComponentActivity() {
                     5 -> { audioOn = !audioOn; retroView.audioEnabled = audioOn }
                     6 -> retroView.shader = ShaderConfig.CRT
                     7 -> retroView.shader = ShaderConfig.Sharp
-                    8 -> cheatPicker.launch(arrayOf("*/*"))
-                    9 -> showCheats()
-                    10 -> finish()
+                    8 -> retroView.shader = ShaderConfig.LCD
+                    9 -> retroView.shader = ShaderConfig.Default
+                    10 -> cheatPicker.launch(arrayOf("*/*"))
+                    11 -> showCheats()
+                    12 -> showControllerSettings()
+                    13 -> finish()
                 }
             }.show()
+    }
+
+
+    private fun showControllerSettings() {
+        try {
+            val ports = retroView.getControllers()
+            if (ports.isEmpty()) {
+                Toast.makeText(this, "Este núcleo não informou tipos de controle configuráveis.", Toast.LENGTH_LONG).show()
+                return
+            }
+            showControllerPort(ports, 0)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Configuração de controle indisponível neste núcleo.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun showControllerPort(ports: Array<Array<com.swordfish.libretrodroid.Controller>>, port: Int) {
+        if (port >= ports.size) return
+        val choices = ports[port]
+        if (choices.isEmpty()) {
+            showControllerPort(ports, port + 1)
+            return
+        }
+        val labels = choices.mapIndexed { index, controller ->
+            controller.description?.takeIf { it.isNotBlank() } ?: "Tipo de controle ${index + 1}"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Controle • Porta ${port + 1}")
+            .setItems(labels) { _, selected ->
+                try { retroView.setControllerType(port, selected) } catch (_: Exception) {}
+                showControllerPort(ports, port + 1)
+            }
+            .setNegativeButton("Pular") { _, _ -> showControllerPort(ports, port + 1) }
+            .show()
     }
 
     private fun saveState() {
