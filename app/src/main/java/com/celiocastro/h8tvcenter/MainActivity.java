@@ -274,17 +274,56 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) { }
     }
 
-    private String systemFor(String filename) {
+    private String systemFor(String filename, String folderPath) {
+        String path = (folderPath + filename).toLowerCase(Locale.ROOT);
+        if (path.contains("native32")) return "NATIVE32";
+        if (path.contains("atari2600") || path.contains("atari 2600") || path.contains("/atari/")) return "ATARI 2600";
+        if (path.contains("megadrive") || path.contains("mega drive") || path.contains("genesis")) return "MEGA DRIVE";
+        if (path.contains("mastersystem") || path.contains("master system")) return "MASTER SYSTEM";
+        if (path.contains("gameboyadvance") || path.contains("game boy advance") || path.contains("/gba/")) return "GAME BOY ADVANCE";
+        if (path.contains("gameboycolor") || path.contains("game boy color") || path.contains("/gbc/")) return "GAME BOY COLOR";
+        if (path.contains("gameboy") || path.contains("game boy") || path.contains("/gb/")) return "GAME BOY";
+        if (path.contains("supernintendo") || path.contains("super nintendo") || path.contains("/snes/")) return "SUPER NINTENDO";
+        if (path.contains("playstation") || path.contains("/ps1/") || path.contains("/psx/")) return "PLAYSTATION";
+        if (path.contains("dreamcast")) return "DREAMCAST";
+        if (path.contains("saturn")) return "SEGA SATURN";
+        if (path.contains("psp")) return "PSP";
+        if (path.contains("nintendo ds") || path.contains("/nds/") || path.contains("nintendods")) return "NINTENDO DS";
+        if (path.contains("nintendo 64") || path.contains("/n64/") || path.contains("nintendo64")) return "NINTENDO 64";
+        if (path.contains("arcade") || path.contains("mame") || path.contains("fbneo")) return "ARCADE";
+        if (path.contains("/nes/") || path.contains("nintendo entertainment")) return "NES";
         String lower = filename.toLowerCase(Locale.ROOT);
         int dot = lower.lastIndexOf('.');
         if (dot < 0 || dot == lower.length()-1) return null;
         String ext = lower.substring(dot+1);
-        for (String[] s : systems) {
-            for (String candidate : s[2].split("\\|")) {
-                if (candidate.equals(ext)) return s[0];
-            }
-        }
+        if (ext.equals("a26")) return "ATARI 2600";
+        if (ext.equals("nes") || ext.equals("unf") || ext.equals("unif")) return "NES";
+        if (ext.equals("sms")) return "MASTER SYSTEM";
+        if (ext.equals("md") || ext.equals("gen")) return "MEGA DRIVE";
+        if (ext.equals("gb")) return "GAME BOY";
+        if (ext.equals("gbc")) return "GAME BOY COLOR";
+        if (ext.equals("gba")) return "GAME BOY ADVANCE";
+        if (ext.equals("sfc") || ext.equals("smc")) return "SUPER NINTENDO";
+        if (ext.equals("zip") || ext.equals("7z")) return "ARCADE";
+        if (ext.equals("n64") || ext.equals("z64") || ext.equals("v64")) return "NINTENDO 64";
+        if (ext.equals("nds")) return "NINTENDO DS";
+        if (ext.equals("cso")) return "PSP";
+        if (ext.equals("cdi") || ext.equals("gdi")) return "DREAMCAST";
+        if (ext.equals("cue") || ext.equals("pbp")) return "PLAYSTATION";
+        if (ext.equals("smf") || ext.equals("sgm") || ext.equals("ssl")) return "NATIVE32";
         return null;
+    }
+
+    private void launchGame(GameFile game) {
+        Set<String> h = history();
+        h.remove(game.uri);
+        h.add(game.uri);
+        prefs.edit().putStringSet(PREF_HISTORY, h).apply();
+        Intent intent = new Intent(this, EmulatorActivity.class);
+        intent.putExtra(EmulatorActivity.EXTRA_ROM_URI, game.uri);
+        intent.putExtra(EmulatorActivity.EXTRA_SYSTEM, game.system);
+        intent.putExtra(EmulatorActivity.EXTRA_TITLE, game.name);
+        startActivity(intent);
     }
 
     private void showGames(String system) {
@@ -356,7 +395,7 @@ public class MainActivity extends Activity {
                 new AlertDialog.Builder(this).setTitle("Informações")
                     .setMessage("Console: " + game.system + "\nArquivo: " + game.path +
                         "\nTamanho: " + readableSize(game.size) +
-                        "\n\nA execução ainda depende da integração do núcleo de emulação deste console.")
+                        "\n\nA execução usa o núcleo Libretro integrado quando disponível.")
                     .setPositiveButton("OK", null).show();
             }
         }).setNegativeButton("Fechar", null).show();
