@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.database.Cursor
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -138,7 +139,7 @@ class EmulatorActivity : ComponentActivity() {
         "NINTENDO DS" -> "melonds_libretro_android.so"
         "DREAMCAST" -> "flycast_libretro_android.so"
         "PSP" -> "ppsspp_libretro_android.so"
-        "SEGA SATURN" -> "yabasanshiro_libretro_android.so"
+        "SEGA SATURN" -> if (Build.SUPPORTED_ABIS.firstOrNull() == "armeabi-v7a") "mednafen_saturn_libretro_android.so" else "yabasanshiro_libretro_android.so"
         "NATIVE32" -> "native32emu_libretro_android.so"
         else -> throw IllegalArgumentException("Sistema ainda sem núcleo configurado: $system")
     }
