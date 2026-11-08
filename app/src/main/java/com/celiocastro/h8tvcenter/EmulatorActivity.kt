@@ -31,6 +31,7 @@ class EmulatorActivity : ComponentActivity() {
     private lateinit var retroView: GLRetroView
     private lateinit var romFile: File
     private lateinit var stateFile: File
+    private lateinit var sramFile: File
     private lateinit var stateDirectory: File
     private lateinit var systemDirectory: File
     private var stateBaseName = "game"
@@ -87,6 +88,8 @@ class EmulatorActivity : ComponentActivity() {
         }
         val safeTitle = title.replace(Regex("[^A-Za-z0-9._-]"), "_")
         stateBaseName = "$system-$safeTitle"
+        val savesDir = File(filesDir, "saves").apply { mkdirs() }
+        sramFile = File(savesDir, "$stateBaseName.srm")
         stateDirectory = File(filesDir, "states").apply { mkdirs() }
         updateStateFile()
 
@@ -95,7 +98,8 @@ class EmulatorActivity : ComponentActivity() {
             coreFilePath = coreFile.absolutePath
             gameFilePath = romFile.absolutePath
             systemDirectory = this@EmulatorActivity.systemDirectory.absolutePath
-            savesDirectory = File(filesDir, "saves").apply { mkdirs() }.absolutePath
+            savesDirectory = savesDir.absolutePath
+            saveRAMState = if (sramFile.exists()) sramFile.readBytes() else null
             shader = ShaderConfig.Default
             viewportAlignment = ViewportAlignment.CENTER
             preferLowLatencyAudio = true
@@ -389,6 +393,12 @@ class EmulatorActivity : ComponentActivity() {
             }.setNegativeButton("Cancelar", null).show()
     }
 
+    private fun saveSRAM() {
+        try {
+            sramFile.writeBytes(retroView.serializeSRAM())
+        } catch (_: Exception) { }
+    }
+
     private fun saveState() {
         try {
             stateFile.writeBytes(retroView.serializeState())
@@ -500,7 +510,10 @@ class EmulatorActivity : ComponentActivity() {
 
     override fun onPause() {
         rewindHandler.removeCallbacks(rewindCapture)
-        if (::retroView.isInitialized && isFinishing) saveState()
+        if (::retroView.isInitialized) {
+            saveSRAM()
+            if (isFinishing) saveState()
+        }
         super.onPause()
     }
 
