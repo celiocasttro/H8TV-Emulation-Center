@@ -198,7 +198,22 @@ class EmulatorActivity : ComponentActivity() {
             .show()
     }
 
-    private fun updateStateFile() {\n        stateFile = File(stateDirectory, "$stateBaseName-slot$currentSlot.state")\n    }\n\n    private fun chooseSaveSlot() {\n        val slots = Array(5) { "Slot ${it + 1}" }\n        AlertDialog.Builder(this).setTitle("Slot de salvamento")\n            .setSingleChoiceItems(slots, currentSlot - 1) { dialog, which ->\n                currentSlot = which + 1\n                updateStateFile()\n                dialog.dismiss()\n                Toast.makeText(this, "Slot $currentSlot selecionado.", Toast.LENGTH_SHORT).show()\n            }.setNegativeButton("Cancelar", null).show()\n    }\n\n    private fun saveState() {
+    private fun updateStateFile() {
+        stateFile = File(stateDirectory, "$stateBaseName-slot$currentSlot.state")
+    }
+
+    private fun chooseSaveSlot() {
+        val slots = Array(5) { "Slot ${it + 1}" }
+        AlertDialog.Builder(this).setTitle("Slot de salvamento")
+            .setSingleChoiceItems(slots, currentSlot - 1) { dialog, which ->
+                currentSlot = which + 1
+                updateStateFile()
+                dialog.dismiss()
+                Toast.makeText(this, "Slot $currentSlot selecionado.", Toast.LENGTH_SHORT).show()
+            }.setNegativeButton("Cancelar", null).show()
+    }
+
+    private fun saveState() {
         try {
             stateFile.writeBytes(retroView.serializeState())
             Toast.makeText(this, "Estado salvo.", Toast.LENGTH_SHORT).show()
