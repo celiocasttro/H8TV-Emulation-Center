@@ -26,6 +26,9 @@ class EmulatorActivity : ComponentActivity() {
     private lateinit var retroView: GLRetroView
     private lateinit var romFile: File
     private lateinit var stateFile: File
+    private lateinit var stateDirectory: File
+    private var stateBaseName = "game"
+    private var currentSlot = 1
     private var fastForward = false
     private var audioOn = true
     private var cheatCodes = mutableListOf<Pair<String, String>>()
@@ -58,8 +61,9 @@ class EmulatorActivity : ComponentActivity() {
             return
         }
         val safeTitle = title.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val stateDir = File(filesDir, "states").apply { mkdirs() }
-        stateFile = File(stateDir, "$safeTitle.state")
+        stateBaseName = "$system-$safeTitle"
+        stateDirectory = File(filesDir, "states").apply { mkdirs() }
+        updateStateFile()
 
         val data = GLRetroViewData(this).apply {
             coreFilePath = coreFile.absolutePath
@@ -122,8 +126,9 @@ class EmulatorActivity : ComponentActivity() {
     private fun showGameMenu(title: String) {
         val options = arrayOf(
             "Continuar",
-            "Salvar estado",
-            "Carregar estado",
+            "Salvar estado (slot $currentSlot)",
+            "Carregar estado (slot $currentSlot)",
+            "Trocar slot de save",
             "Reiniciar jogo",
             if (fastForward) "Desativar avanço rápido" else "Avanço rápido",
             if (audioOn) "Desativar áudio" else "Ativar áudio",
@@ -143,17 +148,18 @@ class EmulatorActivity : ComponentActivity() {
                     0 -> retroView.requestFocus()
                     1 -> saveState()
                     2 -> loadState()
-                    3 -> confirmReset()
-                    4 -> { fastForward = !fastForward; retroView.frameSpeed = if (fastForward) 2 else 1 }
-                    5 -> { audioOn = !audioOn; retroView.audioEnabled = audioOn }
-                    6 -> retroView.shader = ShaderConfig.CRT
-                    7 -> retroView.shader = ShaderConfig.Sharp
-                    8 -> retroView.shader = ShaderConfig.LCD
-                    9 -> retroView.shader = ShaderConfig.Default
-                    10 -> cheatPicker.launch(arrayOf("*/*"))
-                    11 -> showCheats()
-                    12 -> showControllerSettings()
-                    13 -> finish()
+                    3 -> chooseSaveSlot()
+                    4 -> confirmReset()
+                    5 -> { fastForward = !fastForward; retroView.frameSpeed = if (fastForward) 2 else 1 }
+                    6 -> { audioOn = !audioOn; retroView.audioEnabled = audioOn }
+                    7 -> retroView.shader = ShaderConfig.CRT
+                    8 -> retroView.shader = ShaderConfig.Sharp
+                    9 -> retroView.shader = ShaderConfig.LCD
+                    10 -> retroView.shader = ShaderConfig.Default
+                    11 -> cheatPicker.launch(arrayOf("*/*"))
+                    12 -> showCheats()
+                    13 -> showControllerSettings()
+                    14 -> finish()
                 }
             }.show()
     }
@@ -192,7 +198,7 @@ class EmulatorActivity : ComponentActivity() {
             .show()
     }
 
-    private fun saveState() {
+    private fun updateStateFile() {\n        stateFile = File(stateDirectory, "$stateBaseName-slot$currentSlot.state")\n    }\n\n    private fun chooseSaveSlot() {\n        val slots = Array(5) { "Slot ${it + 1}" }\n        AlertDialog.Builder(this).setTitle("Slot de salvamento")\n            .setSingleChoiceItems(slots, currentSlot - 1) { dialog, which ->\n                currentSlot = which + 1\n                updateStateFile()\n                dialog.dismiss()\n                Toast.makeText(this, "Slot $currentSlot selecionado.", Toast.LENGTH_SHORT).show()\n            }.setNegativeButton("Cancelar", null).show()\n    }\n\n    private fun saveState() {
         try {
             stateFile.writeBytes(retroView.serializeState())
             Toast.makeText(this, "Estado salvo.", Toast.LENGTH_SHORT).show()
