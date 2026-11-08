@@ -185,8 +185,8 @@ class EmulatorActivity : ComponentActivity() {
             val raw = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
                 ?: throw IllegalStateException("Arquivo vazio")
             val codes = linkedMapOf<Int, Pair<String, String>>()
-            val descRegex = Regex("""cheat(\\d+)_desc\\s*=\\s*["']?(.*?)["']?\\s*$""", RegexOption.IGNORE_CASE)
-            val codeRegex = Regex("""cheat(\\d+)_code\\s*=\\s*["'](.*?)["']\\s*$""", RegexOption.IGNORE_CASE)
+            val descRegex = Regex("""cheat(\d+)_desc\s*=\s*["']?(.*?)["']?\s*$""", RegexOption.IGNORE_CASE)
+            val codeRegex = Regex("""cheat(\d+)_code\s*=\s*["'](.*?)["']\s*$""", RegexOption.IGNORE_CASE)
             raw.lineSequence().forEach { line ->
                 descRegex.find(line)?.let { m ->
                     val i = m.groupValues[1].toInt()
