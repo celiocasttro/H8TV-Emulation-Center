@@ -326,6 +326,9 @@ class EmulatorActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN || event.keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+            return super.dispatchKeyEvent(event)
+        }
         if (::retroView.isInitialized) {
             if (event.keyCode == KeyEvent.KEYCODE_MENU && event.action == KeyEvent.ACTION_DOWN) {
                 showGameMenu(intent.getStringExtra(EXTRA_TITLE) ?: "Jogo")
