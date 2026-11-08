@@ -81,6 +81,7 @@ public class MainActivity extends Activity {
         immersive();
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         showHome();
+        if (savedTree() != null) scanLibrary();
     }
 
     private void immersive() {
@@ -174,7 +175,7 @@ public class MainActivity extends Activity {
                 name.setGravity(Gravity.CENTER);
                 card.addView(name);
                 card.setOnFocusChangeListener((v, f) -> v.setBackground(round(f ? ACCENT : PANEL)));
-                card.setOnClickListener(v -> { selectedSystem = sys; favoritesOnly = false; showGames(sys); });
+                card.setOnClickListener(v -> { selectedSystem = sys; favoritesOnly = false; if (allGames.isEmpty()) scanLibrary(); else showGames(sys); });
                 LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, dp(88), 1);
                 cp.setMargins(dp(4), dp(3), dp(4), dp(3));
                 row.addView(card, cp);
