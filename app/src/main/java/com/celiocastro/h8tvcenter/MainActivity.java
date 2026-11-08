@@ -296,7 +296,8 @@ public class MainActivity extends Activity {
         body.addView(search);
         LinearLayout list = new LinearLayout(this); list.setOrientation(LinearLayout.VERTICAL);
         body.addView(list);
-        Runnable render = () -> {
+        final Runnable[] renderRef = new Runnable[1];
+        renderRef[0] = () -> {
             list.removeAllViews();
             String term = search.getText().toString().trim().toLowerCase(Locale.ROOT);
             Set<String> fav = favorites();
@@ -318,7 +319,7 @@ public class MainActivity extends Activity {
                     Set<String> updated = favorites();
                     if (!updated.add(game.uri)) updated.remove(game.uri);
                     prefs.edit().putStringSet(PREF_FAVORITES, updated).apply();
-                    render.run();
+                    renderRef[0].run();
                 }));
                 item.setFocusable(true);
                 item.setOnFocusChangeListener((v,f) -> v.setBackground(round(f ? Color.rgb(62,28,33) : PANEL)));
@@ -331,10 +332,10 @@ public class MainActivity extends Activity {
         };
         search.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s,int st,int c,int a) {}
-            public void onTextChanged(CharSequence s,int st,int before,int count) { render.run(); }
+            public void onTextChanged(CharSequence s,int st,int before,int count) { renderRef[0].run(); }
             public void afterTextChanged(android.text.Editable e) {}
         });
-        render.run();
+        renderRef[0].run();
     }
 
     private void showGameDetails(GameFile game) {
