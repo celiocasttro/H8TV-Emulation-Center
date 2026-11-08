@@ -339,14 +339,16 @@ public class MainActivity extends Activity {
     }
 
     private void showGameDetails(GameFile game) {
-        String[] options = {"Adicionar/remover favorito", "Registrar no histórico", "Informações do arquivo"};
+        String[] options = {"▶ Jogar", "Adicionar/remover favorito", "Registrar no histórico", "Informações do arquivo"};
         new AlertDialog.Builder(this).setTitle(game.name).setItems(options, (dialog, which) -> {
             if (which == 0) {
+                launchGame(game);
+            } else if (which == 1) {
                 Set<String> f = favorites();
                 if (!f.add(game.uri)) f.remove(game.uri);
                 prefs.edit().putStringSet(PREF_FAVORITES, f).apply();
                 Toast.makeText(this, "Favoritos atualizados.", Toast.LENGTH_SHORT).show();
-            } else if (which == 1) {
+            } else if (which == 2) {
                 Set<String> h = history(); h.remove(game.uri); h.add(game.uri);
                 prefs.edit().putStringSet(PREF_HISTORY, h).apply();
                 Toast.makeText(this, "Adicionado ao histórico.", Toast.LENGTH_SHORT).show();
