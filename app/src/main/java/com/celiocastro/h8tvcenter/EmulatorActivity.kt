@@ -286,7 +286,7 @@ class EmulatorActivity : ComponentActivity() {
 
     private fun importBiosFolder(tree: Uri) {
         try {
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
             try { contentResolver.takePersistableUriPermission(tree, flags) } catch (_: Exception) {}
             systemDirectory = File(filesDir, "system").apply { mkdirs() }
             val rootId = DocumentsContract.getTreeDocumentId(tree)
