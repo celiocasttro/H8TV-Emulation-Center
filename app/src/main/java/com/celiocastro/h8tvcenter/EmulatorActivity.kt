@@ -145,22 +145,22 @@ class EmulatorActivity : ComponentActivity() {
             val text = mainFile.readText()
             val referenced = linkedSetOf<String>()
             if (ext == ".cue") {
-                val quoted = Regex("""(?i)^\\s*FILE\\s+"([^"]+)"\\s+\\w+""")
-                val plain = Regex("""(?i)^\\s*FILE\\s+(\\S+)\\s+\\w+""")
+                val quoted = Regex("""(?i)^\s*FILE\s+"([^"]+)"\s+\w+""")
+                val plain = Regex("""(?i)^\s*FILE\s+(\S+)\s+\w+""")
                 text.lineSequence().forEach { line ->
                     (quoted.find(line)?.groupValues?.get(1) ?: plain.find(line)?.groupValues?.get(1))
-                        ?.let { referenced.add(it.substringAfterLast('/').substringAfterLast('\\\\')) }
+                        ?.let { referenced.add(it.substringAfterLast('/').substringAfterLast('\\')) }
                 }
             } else if (ext == ".gdi") {
-                val gdiTrack = Regex("""(?i)^\\s*\\d+\\s+\\d+\\s+\\d+\\s+\\d+\\s+"?(.+?\\.(?:bin|raw|wav|iso))"?\\s+\\d+\\s*$""")
+                val gdiTrack = Regex("""(?i)^\s*\d+\s+\d+\s+\d+\s+\d+\s+"?(.+?\.(?:bin|raw|wav|iso))"?\s+\d+\s*$""")
                 text.lineSequence().forEach { line ->
                     gdiTrack.find(line)?.groupValues?.get(1)?.let {
-                        referenced.add(it.substringAfterLast('/').substringAfterLast('\\\\'))
+                        referenced.add(it.substringAfterLast('/').substringAfterLast('\\'))
                     }
                 }
             } else {
                 text.lineSequence().map { it.trim() }.filter { it.isNotBlank() && !it.startsWith("#") }
-                    .forEach { referenced.add(it.substringAfterLast('/').substringAfterLast('\\\\')) }
+                    .forEach { referenced.add(it.substringAfterLast('/').substringAfterLast('\\')) }
             }
             copySiblingFiles(uri, folder, referenced)
         }
