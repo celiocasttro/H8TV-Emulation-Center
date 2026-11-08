@@ -4,6 +4,8 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -20,6 +22,7 @@ import com.swordfish.libretrodroid.GLRetroViewData
 import com.swordfish.libretrodroid.ShaderConfig
 import com.swordfish.libretrodroid.ViewportAlignment
 import java.io.File
+import java.util.ArrayDeque
 import java.util.Locale
 
 class EmulatorActivity : ComponentActivity() {
@@ -32,6 +35,22 @@ class EmulatorActivity : ComponentActivity() {
     private var fastForward = false
     private var audioOn = true
     private var cheatCodes = mutableListOf<Pair<String, String>>()
+    private val rewindStates = ArrayDeque<ByteArray>()
+    private val rewindHandler = Handler(Looper.getMainLooper())
+    private val rewindCapture = object : Runnable {
+        override fun run() {
+            if (::retroView.isInitialized) {
+                try {
+                    val snapshot = retroView.serializeState()
+                    synchronized(rewindStates) {
+                        rewindStates.addLast(snapshot)
+                        while (rewindStates.size > 2) rewindStates.removeFirst()
+                    }
+                } catch (_: Exception) { }
+            }
+            rewindHandler.postDelayed(this, 5000)
+        }
+    }
 
     private val cheatPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) loadCheatFile(uri)
@@ -136,6 +155,7 @@ class EmulatorActivity : ComponentActivity() {
             "Imagem nítida",
             "Filtro LCD",
             "Imagem padrão",
+            "Rewind (voltar 5 segundos)",
             "Carregar cheats (.cht)",
             "Gerenciar cheats",
             "Configurar controle",
@@ -156,14 +176,31 @@ class EmulatorActivity : ComponentActivity() {
                     8 -> retroView.shader = ShaderConfig.Sharp
                     9 -> retroView.shader = ShaderConfig.LCD
                     10 -> retroView.shader = ShaderConfig.Default
-                    11 -> cheatPicker.launch(arrayOf("*/*"))
-                    12 -> showCheats()
-                    13 -> showControllerSettings()
-                    14 -> finish()
+                    11 -> rewindFiveSeconds()
+                    12 -> cheatPicker.launch(arrayOf("*/*"))
+                    13 -> showCheats()
+                    14 -> showControllerSettings()
+                    15 -> finish()
                 }
             }.show()
     }
 
+
+    private fun rewindFiveSeconds() {
+        try {
+            val previous = synchronized(rewindStates) {
+                if (rewindStates.size < 2) null else {
+                    rewindStates.removeLast()
+                    rewindStates.peekLast()
+                }
+            }
+            if (previous == null || !retroView.unserializeState(previous)) {
+                Toast.makeText(this, "Ainda não há histórico suficiente para rewind.", Toast.LENGTH_SHORT).show()
+            }
+        } catch (_: Exception) {
+            Toast.makeText(this, "Rewind não é suportado por este núcleo.", Toast.LENGTH_LONG).show()
+        }
+    }
 
     private fun showControllerSettings() {
         try {
@@ -314,7 +351,13 @@ class EmulatorActivity : ComponentActivity() {
         return super.onGenericMotionEvent(event)
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::retroView.isInitialized) rewindHandler.postDelayed(rewindCapture, 5000)
+    }
+
     override fun onPause() {
+        rewindHandler.removeCallbacks(rewindCapture)
         if (::retroView.isInitialized && isFinishing) saveState()
         super.onPause()
     }
