@@ -47,20 +47,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DEST="app/src/main/jniLibs/arm64-v8a"
-          mkdir -p "$DEST"
-          BASE="https://buildbot.libretro.com/nightly/android/latest/arm64-v8a"
           CORES=(stella nestopia genesis_plus_gx gambatte mgba snes9x fbneo pcsx_rearmed mupen64plus_next_gles3 melonds flycast ppsspp yabasanshiro native32emu)
-          for core in "${CORES[@]}"; do
-            archive="/tmp/${core}.zip"
-            curl --retry 3 --retry-delay 2 -fsSL "$BASE/${core}_libretro_android.so.zip" -o "$archive"
-            mkdir -p "/tmp/core-${core}"
-            unzip -o -q "$archive" -d "/tmp/core-${core}"
-            binary="$(find "/tmp/core-${core}" -type f -name '*_libretro_android.so' -print -quit)"
-            test -n "$binary"
-            cp "$binary" "$DEST/"
+          for abi in arm64-v8a armeabi-v7a; do
+            DEST="app/src/main/jniLibs/$abi"
+            mkdir -p "$DEST"
+            BASE="https://buildbot.libretro.com/nightly/android/latest/$abi"
+            for core in "${CORES[@]}"; do
+              archive="/tmp/${core}-${abi}.zip"
+              curl --retry 3 --retry-delay 2 -fsSL "$BASE/${core}_libretro_android.so.zip" -o "$archive"
+              mkdir -p "/tmp/core-${core}-${abi}"
+              unzip -o -q "$archive" -d "/tmp/core-${core}-${abi}"
+              binary="$(find "/tmp/core-${core}-${abi}" -type f -name '*_libretro_android.so' -print -quit)"
+              test -n "$binary"
+              cp "$binary" "$DEST/"
+            done
+            ls -lh "$DEST"
           done
-          ls -lh "$DEST"
 
       - name: Reuse debug signing key for consistent APK updates
         uses: actions/cache@v4
